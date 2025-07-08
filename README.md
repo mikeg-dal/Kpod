@@ -18,3 +18,4 @@ Unzip the application, and place it in your apps folder.  run it and it should a
 
 You close it by force quit for now since I dont have a menu system.  The KPOD has to be plugged in before running it.  To verify its running you can run ps -ax | grep KPOD.  you should see a process ID with the location of the KPOD-Bridge.
 
+I provided the pre-made app file in a zip folder, this was built using pyinstaller to create the app.  The source is listed here as well.
