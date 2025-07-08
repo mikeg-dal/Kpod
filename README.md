@@ -13,26 +13,8 @@ Make sure the checkbox for Device is Online is selected.
 
 Close out of the windows.
 
-Python Pre-requisites
 
-Create your Python Environment
+Unzip the application, and place it in your apps folder.  run it and it should ask for permissions since I didnt sign it with my dev account.  
 
- python3 -m venv ~/kpodenv
-
-Activate your python environment
-
-source ~/kpodenv/bin/activate
-
-Install pip requirements(one time only)
-------------- ------------
-hid           1.0.8
-hidapi        0.14.0.post4
-pip           24.2
-python-rtmidi 1.5.8
-setuptools    80.9.0
-
-
-
-
-Still in progress getting the pre-req.  Home brew also used to install HIDAPI.
+You close it by force quit for now since I dont have a menu system.  The KPOD has to be plugged in before running it.  To verify its running you can run ps -ax | grep KPOD.  you should see a process ID with the location of the KPOD-Bridge.
 
