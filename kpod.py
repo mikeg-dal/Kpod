@@ -17,7 +17,7 @@ Requires:
   - IAC Driver to be enabled and at least one port created
   - macOS MIDI setup to route MIDI data to a listening application
 
-Author: [Your Name]
+Author: Mike Garcia
 """
 
 import hid
@@ -28,10 +28,10 @@ import rtmidi
 # KPOD USB identifiers
 VENDOR_ID = 0x04d8
 PRODUCT_ID = 0xF12D
-KPOD_USB_CMD_UPDATE = ord('u')  # Command to request status
-REPORT_LEN = 8                  # Expected length of response packet
+KPOD_USB_CMD_UPDATE = ord('u')
+REPORT_LEN = 8
 
-# Mapping for TAP buttons (front panel 1–8): flags from 0x41 to 0x48
+# TAP buttons: flags 0x41–0x48
 TAP_NOTE_MAP = {
     0x41: 64,
     0x42: 65,
@@ -43,7 +43,7 @@ TAP_NOTE_MAP = {
     0x48: 71,
 }
 
-# Mapping for HOLD buttons (same buttons pressed and held): flags from 0x51 to 0x58
+# HOLD buttons: flags 0x51–0x58
 HOLD_NOTE_MAP = {
     0x51: 72,
     0x52: 73,
@@ -55,9 +55,12 @@ HOLD_NOTE_MAP = {
     0x58: 79,
 }
 
-# Knob turn mappings (CW = clockwise, CCW = counterclockwise)
-ENCODER_CW_NOTE = 100
-ENCODER_CCW_NOTE = 101
+# Encoder tick MIDI note mapping by rocker position
+ROCKER_NOTE_MAP = {
+    0x40: (100, 101),  # VFO A (Left)
+    0x00: (102, 103),  # VFO B (Center)
+    0x20: (104, 105),  # XIT/RIT (Right)
+}
 
 # Open MIDI output to IAC Driver
 midi_out = rtmidi.MidiOut()
@@ -77,42 +80,50 @@ def send_note(note, velocity=127):
     midi_out.send_message([0x80, note, 0])
 
 def main():
-    """Main loop: read KPOD HID data and emit MIDI events."""
     try:
         dev = hid.Device(VENDOR_ID, PRODUCT_ID)
     except Exception as e:
         print(f"❌ Could not open KPOD: {e}")
         return
 
-    dev.set_nonblocking = False
+    dev.nonblocking = False
     print("✅ Connected to KPOD")
 
-    last_flags = 0  # Used to detect changes (edge trigger)
+    current_rocker = 0x00  # Default: Center
+    last_flags = 0
 
     try:
         while True:
-            # Send update request to KPOD
             pkt = bytes([KPOD_USB_CMD_UPDATE]) + bytes(7)
             dev.write(pkt)
-
-            # Read back the response
             response = dev.read(REPORT_LEN)
 
             if response and len(response) == 8:
-                ticks = struct.unpack("<h", bytes(response[1:3]))[0]  # Encoder ticks
-                flags = response[3]  # Button + tap/hold + rocker state
+                ticks = struct.unpack("<h", bytes(response[1:3]))[0]
+                flags = response[3]
 
-                # --- Encoder Turned ---
+                # Rocker detection (stateful)
+                if flags & 0x40:
+                    current_rocker = 0x40  # VFO A
+                elif flags & 0x20:
+                    current_rocker = 0x20  # XIT/RIT
+                elif current_rocker in (0x40, 0x20):
+                    current_rocker = 0x00  # Inferred Center
+
+                # Get MIDI notes based on rocker position
+                cw_note, ccw_note = ROCKER_NOTE_MAP.get(current_rocker, (102, 103))
+
+                # Send MIDI notes based on encoder direction
                 if ticks > 0:
                     for _ in range(ticks):
-                        send_note(ENCODER_CW_NOTE)
-                        print(f"↻ CW → Note {ENCODER_CW_NOTE}")
+                        send_note(cw_note)
+                        print(f"↻ CW → Note {cw_note} (Rocker: 0x{current_rocker:02X})")
                 elif ticks < 0:
                     for _ in range(abs(ticks)):
-                        send_note(ENCODER_CCW_NOTE)
-                        print(f"↺ CCW → Note {ENCODER_CCW_NOTE}")
+                        send_note(ccw_note)
+                        print(f"↺ CCW → Note {ccw_note} (Rocker: 0x{current_rocker:02X})")
 
-                # --- Buttons ---
+                # TAP and HOLD detection
                 if flags != last_flags:
                     if flags in TAP_NOTE_MAP:
                         note = TAP_NOTE_MAP[flags]
@@ -123,13 +134,7 @@ def main():
                         send_note(note)
                         print(f"🕹️ HOLD {note} (flags=0x{flags:02X})")
 
-                    # 🚧 Future: Rocker switch decoding
-                    # if flags & 0x10:  # LEFT rocker
-                    #     ...
-                    # if flags & 0x20:  # RIGHT rocker
-                    #     ...
-
-                last_flags = flags
+                    last_flags = flags
 
             time.sleep(0.005)
 
