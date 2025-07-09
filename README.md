@@ -1,3 +1,7 @@
+Video showing setup.
+
+https://youtu.be/CvL_pqLJApE
+
 This allows the Elecraft Kpod to be plugged directly into the MAC OS USB port.  Once that is done you can control K4 Control Software by setting up the KPOD as a MIDI Controller and mapping the VFO and buttons whatever you like inside K4Control.
 Pre-Requisites.
 
